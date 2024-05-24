@@ -56,7 +56,7 @@ async def process_image(
     seed: int = Form(-1),
     batch_size: int = Form(1),
     steps: int = Form(45),
-    cfg_scale: int = Form(7),
+    cfg_scale: int = Form(17),
     width: int = Form(768),
     height: int = Form(768),
     negative_prompt: str = Form(""),
