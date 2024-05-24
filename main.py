@@ -51,27 +51,69 @@ class DataModel(BaseModel):
     }
 
 @app.post("/process-image/")
-async def process_image(data: str = Form(...), file: UploadFile = File(...)):
-    try:
-        data_dict = json.loads(data)
-        data_model = DataModel(**data_dict)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON data")
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    # Check if prompt is provided
-    if not data_model.prompt or data_model.prompt.strip() == "":
+async def process_image(
+    prompt: str = Form(...),
+    seed: int = Form(-1),
+    batch_size: int = Form(1),
+    steps: int = Form(45),
+    cfg_scale: int = Form(7),
+    width: int = Form(768),
+    height: int = Form(768),
+    negative_prompt: str = Form(""),
+    sampler: str = Form("DPM++ 2M"),
+    sampler_index: str = Form("DPM++ 2M"),
+    send_images: bool = Form(True),
+    save_images: bool = Form(True),
+    controlnet_model: str = Form("control_v11p_sd15_softedge [a8575a2a]"),
+    controlnet_weight: float = Form(1),
+    controlnet_guidance_start: float = Form(0),
+    controlnet_low_vram: bool = Form(False),
+    controlnet_processor_res: int = Form(768),
+    controlnet_guidance_end: float = Form(1),
+    controlnet_control_mode: int = Form(0),
+    controlnet_resize_mode: int = Form(1),
+    controlnet_pixel_perfect: bool = Form(True),
+    file: UploadFile = File(...)):    
+    if not prompt.strip():
         raise HTTPException(status_code=400, detail="Please provide a prompt")
 
     # Read and encode the image as base64
     image_data = await file.read()
     encoded_image = base64.b64encode(image_data).decode('utf-8')
 
-    # Update alwayson_scripts with the encoded image
-    for arg in data_model.alwayson_scripts["controlnet"].args:
-        arg.input_image = encoded_image
-
+    # Create the data dictionary
+    data = {
+        "prompt": prompt,
+        "seed": seed,
+        "batch_size": batch_size,
+        "steps": steps,
+        "cfg_scale": cfg_scale,
+        "width": width,
+        "height": height,
+        "negative_prompt": negative_prompt,
+        "sampler": sampler,
+        "sampler_index": sampler_index,
+        "send_images": send_images,
+        "save_images": save_images,
+        "alwayson_scripts": {
+            "controlnet": {
+                "args": [
+                    {
+                        "model": controlnet_model,
+                        "weight": controlnet_weight,
+                        "guidance_start": controlnet_guidance_start,
+                        "low_vram": controlnet_low_vram,
+                        "processor_res": controlnet_processor_res,
+                        "guidance_end": controlnet_guidance_end,
+                        "control_mode": controlnet_control_mode,
+                        "resize_mode": controlnet_resize_mode,
+                        "pixel_perfect": controlnet_pixel_perfect,
+                        "input_image": encoded_image
+                    }
+                ]
+            }
+        }
+    }
     # URL of the API endpoint
     url = os.environ.get("APP_URL")
 
@@ -81,7 +123,7 @@ async def process_image(data: str = Form(...), file: UploadFile = File(...)):
     }
 
     # Convert the data model to JSON
-    data_json = data_model.json()
+    data_json = json.dumps(data)
 
     # Sending the POST request
     response = requests.post(url, headers=headers, data=data_json)
